@@ -3,3 +3,4 @@ gunicorn
 werkzeug
 psycopg2-binary
 openai
+googlesearch-python
