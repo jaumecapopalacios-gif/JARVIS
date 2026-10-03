@@ -2,4 +2,4 @@ Flask
 gunicorn
 werkzeug
 psycopg2-binary
-groq
+openai
