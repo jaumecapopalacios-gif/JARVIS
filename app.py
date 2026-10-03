@@ -75,35 +75,44 @@ def preguntar_jarvis(mensaje):
     if not api_key:
         return "No tengo configurada mi clave de OpenRouter."
 
-    try:
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
-        )
+    # Lista de modelos de respaldo (si uno falla, prueba el siguiente)
+    modelos = [
+        "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "google/gemma-3-12b-it:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "openrouter/free"
+    ]
 
-        response = client.chat.completions.create(
-            model="google/gemini-2.0-flash-exp:free",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Eres Jarvis, un asistente personal inteligente. "
-                        "Hablas en español, eres amigable, directo y útil. "
-                        "Respondes de forma clara y breve (máximo 3 oraciones) "
-                        "porque tus respuestas se leerán en voz alta. "
-                        "Si te piden algo técnico, explica simple."
-                    )
-                },
-                {"role": "user", "content": mensaje}
-            ],
-            temperature=0.7,
-            max_tokens=300
-        )
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=api_key,
+    )
 
-        return response.choices[0].message.content
+    for modelo in modelos:
+        try:
+            response = client.chat.completions.create(
+                model=modelo,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Eres Jarvis, un asistente personal inteligente. "
+                            "Hablas en español, eres amigable, directo y útil. "
+                            "Respondes de forma clara y breve (máximo 3 oraciones) "
+                            "porque tus respuestas se leerán en voz alta. "
+                            "Si te piden algo técnico, explica simple."
+                        )
+                    },
+                    {"role": "user", "content": mensaje}
+                ],
+                temperature=0.7,
+                max_tokens=300
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            continue
 
-    except Exception as e:
-        return f"Error: {str(e)}"
+    return "Lo siento, no pude procesar tu mensaje. Intenta de nuevo."
 
 
 @app.route("/")
