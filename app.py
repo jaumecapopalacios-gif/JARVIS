@@ -14,6 +14,7 @@ from flask import (
 )
 
 from openai import OpenAI
+from googlesearch import search
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -69,51 +70,145 @@ def init_db():
     cur.close()
 
 
+# =========================================================
+# HERRAMIENTAS (TOOLS) QUE JARVIS PUEDE USAR
+# =========================================================
+
+def obtener_hora():
+    """Devuelve la hora y fecha actuales del servidor."""
+    ahora = datetime.now()
+    return ahora.strftime("Son las %H:%M del %d/%m/%Y.")
+
+
+def buscar_en_google(query):
+    """Busca en Google y devuelve los 3 primeros resultados."""
+    try:
+        resultados = search(query, num_results=3, lang="es")
+        lineas = []
+        for i, url in enumerate(resultados, 1):
+            lineas.append(f"{i}. {url}")
+        return "Resultados de Google:\n" + "\n".join(lineas)
+    except Exception as e:
+        return f"Error al buscar en Google: {str(e)}"
+
+
+# Lista de herramientas disponibles para la IA
+HERRAMIENTAS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "obtener_hora",
+            "description": "Útil para saber la hora y fecha actuales.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "buscar_en_google",
+            "description": "Busca información actual en Google. Úsalo cuando el usuario pida buscar algo, noticias o información que no sepas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "El término de búsqueda, ej: 'noticias de tecnología'",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
+]
+
+
+# =========================================================
+# LÓGICA DE JARVIS CON TOOL CALLING
+# =========================================================
+
 def preguntar_jarvis(mensaje):
     api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
         return "No tengo configurada mi clave de OpenRouter."
 
-    # Lista de modelos de respaldo (si uno falla, prueba el siguiente)
-    modelos = [
-        "nvidia/nemotron-3-ultra-550b-a55b:free",
-        "google/gemma-3-12b-it:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "openrouter/free"
-    ]
-
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=api_key,
     )
 
-    for modelo in modelos:
-        try:
-            response = client.chat.completions.create(
-                model=modelo,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Eres Jarvis, un asistente personal inteligente. "
-                            "Hablas en español, eres amigable, directo y útil. "
-                            "Respondes de forma clara y breve (máximo 3 oraciones) "
-                            "porque tus respuestas se leerán en voz alta. "
-                            "Si te piden algo técnico, explica simple."
-                        )
-                    },
-                    {"role": "user", "content": mensaje}
-                ],
-                temperature=0.7,
-                max_tokens=300
+    # 1. Enviamos el mensaje y las herramientas disponibles
+    try:
+        response = client.chat.completions.create(
+            model="nvidia/nemotron-3-ultra-550b-a55b:free",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres Jarvis, un asistente personal inteligente. "
+                        "Hablas en español, eres amigable, directo y útil. "
+                        "Puedes usar herramientas para obtener la hora o buscar en Google. "
+                        "Si el usuario pide algo que no sabes o que necesita información actual, usa la herramienta buscar_en_google. "
+                        "Responde de forma clara y breve (máximo 3 oraciones)."
+                    )
+                },
+                {"role": "user", "content": mensaje}
+            ],
+            tools=HERRAMIENTAS,
+            tool_choice="auto",  # La IA decide si usar una herramienta
+        )
+
+        respuesta = response.choices[0].message
+
+        # 2. Comprobamos si la IA quiere usar una herramienta
+        if respuesta.tool_calls:
+            tool_call = respuesta.tool_calls[0]
+            nombre_funcion = tool_call.function.name
+            argumentos = tool_call.function.arguments
+
+            resultado_herramienta = ""
+
+            if nombre_funcion == "obtener_hora":
+                resultado_herramienta = obtener_hora()
+            elif nombre_funcion == "buscar_en_google":
+                import json
+                args = json.loads(argumentos)
+                resultado_herramienta = buscar_en_google(args.get("query", ""))
+
+            # 3. Enviamos el resultado de la herramienta de vuelta a la IA
+            mensajes_con_resultado = [
+                {"role": "system", "content": "Eres Jarvis, un asistente personal inteligente. Hablas en español."},
+                {"role": "user", "content": mensaje},
+                respuesta,
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": str(resultado_herramienta),
+                }
+            ]
+
+            # 4. La IA genera la respuesta final para el usuario
+            response_final = client.chat.completions.create(
+                model="nvidia/nemotron-3-ultra-550b-a55b:free",
+                messages=mensajes_con_resultado,
             )
-            return response.choices[0].message.content
-        except Exception as e:
-            continue
 
-    return "Lo siento, no pude procesar tu mensaje. Intenta de nuevo."
+            return response_final.choices[0].message.content
 
+        # Si no usó herramientas, devolvemos su respuesta directa
+        return respuesta.content
+
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
+# =========================================================
+# RUTAS DE FLASK
+# =========================================================
 
 @app.route("/")
 def index():
