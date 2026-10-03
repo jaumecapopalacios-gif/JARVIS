@@ -5,6 +5,9 @@ const btnMic = document.getElementById("btn-mic");
 let escuchando = false;
 let recognition = null;
 
+// Detectar zona horaria del navegador
+const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Havana";
+
 if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
@@ -54,7 +57,10 @@ async function enviarTexto(desdeVoz) {
         const res = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: mensaje })
+            body: JSON.stringify({
+                message: mensaje,
+                timezone: USER_TIMEZONE
+            })
         });
 
         const data = await res.json();
