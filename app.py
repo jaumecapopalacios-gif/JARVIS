@@ -13,10 +13,7 @@ from flask import (
     g
 )
 
-try:
-    from groq import Groq
-except ImportError:
-    Groq = None
+from openai import OpenAI
 
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -73,16 +70,19 @@ def init_db():
 
 
 def preguntar_jarvis(mensaje):
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
 
-    if not api_key or Groq is None:
-        return "No tengo configurada mi clave de Groq."
+    if not api_key:
+        return "No tengo configurada mi clave de OpenRouter."
 
     try:
-        client = Groq(api_key=api_key)
+        client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+        )
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="meta-llama/llama-3.3-70b-instruct:free",
             messages=[
                 {
                     "role": "system",
