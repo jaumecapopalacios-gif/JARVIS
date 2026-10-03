@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="jarvis-container">
+
+    <header class="jarvis-header">
+        <h1>JARVIS</h1>
+        <a href="{{ url_for('history') }}" class="btn-history">📜 Historial</a>
+    </header>
+
+    <div class="chat-area" id="chat-area">
+        <div class="message jarvis">
+            <p>Hola, soy Jarvis. ¿En qué te ayudo?</p>
+        </div>
+    </div>
+
+    <div class="controls">
+
+        <button class="btn-mic" id="btn-mic" onclick="toggleVoz()">
+            🎙️
+        </button>
+
+        <div class="input-row">
+            <input
+                type="text"
+                id="input-text"
+                placeholder="Escribe o habla..."
+                autocomplete="off"
+            >
+            <button class="btn-send" onclick="enviarTexto(false)">
+                ➤
+            </button>
+        </div>
+
+    </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='jarvis.js') }}"></script>
+
+</body>
+</html>
