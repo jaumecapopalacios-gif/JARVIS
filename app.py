@@ -1,6 +1,8 @@
 import os
+import json
 import secrets
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import psycopg2
 import psycopg2.extras
@@ -75,9 +77,19 @@ def init_db():
 # =========================================================
 
 def obtener_hora():
-    """Devuelve la hora y fecha actuales del servidor."""
-    ahora = datetime.now()
-    return ahora.strftime("Son las %H:%M del %d/%m/%Y.")
+    """Devuelve la hora actual de Cuba."""
+    ahora = datetime.now(ZoneInfo("America/Havana"))
+    dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ]
+    dia_semana = dias[ahora.weekday()]
+    mes = meses[ahora.month - 1]
+    return (
+        f"En Cuba son las {ahora.strftime('%H:%M')} "
+        f"del {dia_semana} {ahora.day} de {mes} de {ahora.year}."
+    )
 
 
 def buscar_en_google(query):
@@ -87,18 +99,19 @@ def buscar_en_google(query):
         lineas = []
         for i, url in enumerate(resultados, 1):
             lineas.append(f"{i}. {url}")
+        if not lineas:
+            return "No encontré resultados."
         return "Resultados de Google:\n" + "\n".join(lineas)
     except Exception as e:
         return f"Error al buscar en Google: {str(e)}"
 
 
-# Lista de herramientas disponibles para la IA
 HERRAMIENTAS = [
     {
         "type": "function",
         "function": {
             "name": "obtener_hora",
-            "description": "Útil para saber la hora y fecha actuales.",
+            "description": "Útil para saber la hora y fecha actuales en Cuba.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -141,7 +154,6 @@ def preguntar_jarvis(mensaje):
         api_key=api_key,
     )
 
-    # 1. Enviamos el mensaje y las herramientas disponibles
     try:
         response = client.chat.completions.create(
             model="nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -151,20 +163,20 @@ def preguntar_jarvis(mensaje):
                     "content": (
                         "Eres Jarvis, un asistente personal inteligente. "
                         "Hablas en español, eres amigable, directo y útil. "
-                        "Puedes usar herramientas para obtener la hora o buscar en Google. "
-                        "Si el usuario pide algo que no sabes o que necesita información actual, usa la herramienta buscar_en_google. "
+                        "Puedes usar herramientas para obtener la hora exacta de Cuba o buscar en Google. "
+                        "Cuando te pregunten la hora, SIEMPRE usa la herramienta obtener_hora. "
+                        "Cuando necesites información actual, usa buscar_en_google. "
                         "Responde de forma clara y breve (máximo 3 oraciones)."
                     )
                 },
                 {"role": "user", "content": mensaje}
             ],
             tools=HERRAMIENTAS,
-            tool_choice="auto",  # La IA decide si usar una herramienta
+            tool_choice="auto",
         )
 
         respuesta = response.choices[0].message
 
-        # 2. Comprobamos si la IA quiere usar una herramienta
         if respuesta.tool_calls:
             tool_call = respuesta.tool_calls[0]
             nombre_funcion = tool_call.function.name
@@ -175,13 +187,18 @@ def preguntar_jarvis(mensaje):
             if nombre_funcion == "obtener_hora":
                 resultado_herramienta = obtener_hora()
             elif nombre_funcion == "buscar_en_google":
-                import json
                 args = json.loads(argumentos)
                 resultado_herramienta = buscar_en_google(args.get("query", ""))
 
-            # 3. Enviamos el resultado de la herramienta de vuelta a la IA
             mensajes_con_resultado = [
-                {"role": "system", "content": "Eres Jarvis, un asistente personal inteligente. Hablas en español."},
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres Jarvis, un asistente personal inteligente. "
+                        "Hablas en español. Cuando tengas el resultado de una herramienta, "
+                        "responde al usuario de forma natural y breve."
+                    )
+                },
                 {"role": "user", "content": mensaje},
                 respuesta,
                 {
@@ -191,7 +208,6 @@ def preguntar_jarvis(mensaje):
                 }
             ]
 
-            # 4. La IA genera la respuesta final para el usuario
             response_final = client.chat.completions.create(
                 model="nvidia/nemotron-3-ultra-550b-a55b:free",
                 messages=mensajes_con_resultado,
@@ -199,7 +215,6 @@ def preguntar_jarvis(mensaje):
 
             return response_final.choices[0].message.content
 
-        # Si no usó herramientas, devolvemos su respuesta directa
         return respuesta.content
 
     except Exception as e:
