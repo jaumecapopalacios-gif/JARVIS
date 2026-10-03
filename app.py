@@ -2,7 +2,7 @@ import os
 import json
 import secrets
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import psycopg2
 import psycopg2.extras
@@ -76,9 +76,14 @@ def init_db():
 # HERRAMIENTAS (TOOLS) QUE JARVIS PUEDE USAR
 # =========================================================
 
-def obtener_hora():
-    """Devuelve la hora actual de Cuba."""
-    ahora = datetime.now(ZoneInfo("America/Havana"))
+def obtener_hora(timezone_str="America/Havana"):
+    """Devuelve la hora actual en la zona horaria del usuario."""
+    try:
+        zona = ZoneInfo(timezone_str)
+    except (ZoneInfoNotFoundError, Exception):
+        zona = ZoneInfo("America/Havana")
+
+    ahora = datetime.now(zona)
     dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     meses = [
         "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -86,8 +91,9 @@ def obtener_hora():
     ]
     dia_semana = dias[ahora.weekday()]
     mes = meses[ahora.month - 1]
+
     return (
-        f"En Cuba son las {ahora.strftime('%H:%M')} "
+        f"En la zona horaria '{timezone_str}' son las {ahora.strftime('%H:%M')} "
         f"del {dia_semana} {ahora.day} de {mes} de {ahora.year}."
     )
 
@@ -111,7 +117,7 @@ HERRAMIENTAS = [
         "type": "function",
         "function": {
             "name": "obtener_hora",
-            "description": "Útil para saber la hora y fecha actuales en Cuba.",
+            "description": "Útil para saber la hora y fecha actuales del usuario.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -143,7 +149,7 @@ HERRAMIENTAS = [
 # LÓGICA DE JARVIS CON TOOL CALLING
 # =========================================================
 
-def preguntar_jarvis(mensaje):
+def preguntar_jarvis(mensaje, timezone_str="America/Havana"):
     api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
@@ -163,7 +169,8 @@ def preguntar_jarvis(mensaje):
                     "content": (
                         "Eres Jarvis, un asistente personal inteligente. "
                         "Hablas en español, eres amigable, directo y útil. "
-                        "Puedes usar herramientas para obtener la hora exacta de Cuba o buscar en Google. "
+                        f"El usuario está en la zona horaria '{timezone_str}'. "
+                        "Puedes usar herramientas para obtener la hora exacta o buscar en Google. "
                         "Cuando te pregunten la hora, SIEMPRE usa la herramienta obtener_hora. "
                         "Cuando necesites información actual, usa buscar_en_google. "
                         "Responde de forma clara y breve (máximo 3 oraciones)."
@@ -185,7 +192,7 @@ def preguntar_jarvis(mensaje):
             resultado_herramienta = ""
 
             if nombre_funcion == "obtener_hora":
-                resultado_herramienta = obtener_hora()
+                resultado_herramienta = obtener_hora(timezone_str)
             elif nombre_funcion == "buscar_en_google":
                 args = json.loads(argumentos)
                 resultado_herramienta = buscar_en_google(args.get("query", ""))
@@ -245,6 +252,7 @@ def history():
 def api_chat():
     data = request.get_json(silent=True) or {}
     mensaje = str(data.get("message", "")).strip()
+    timezone_str = str(data.get("timezone", "America/Havana")).strip()
 
     if not mensaje:
         return jsonify({"ok": False, "error": "Escribe algo."}), 400
@@ -256,7 +264,7 @@ def api_chat():
         VALUES (%s, %s, %s)
     """, ("user", mensaje, now))
 
-    respuesta = preguntar_jarvis(mensaje)
+    respuesta = preguntar_jarvis(mensaje, timezone_str)
 
     execute_db("""
         INSERT INTO conversations (role, message, created_at)
