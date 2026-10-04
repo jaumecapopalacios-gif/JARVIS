@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis - Iniciar sesión</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h1 class="auth-title">JARVIS</h1>
+        <p class="auth-subtitle">Inicia sesión para continuar</p>
+
+        {% if error %}
+            <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="auth-form">
+            <input
+                type="email"
+                name="email"
+                placeholder="Correo electrónico"
+                autocomplete="email"
+                required
+            >
+            <input
+                type="password"
+                name="password"
+                placeholder="Contraseña"
+                autocomplete="current-password"
+                required
+            >
+            <button type="submit" class="btn-auth">Iniciar sesión</button>
+        </form>
+
+        <p class="auth-footer">
+            ¿No tienes cuenta?
+            <a href="{{ url_for('register') }}">Crear cuenta</a>
+        </p>
+    </div>
+</div>
+
+</body>
+</html>
