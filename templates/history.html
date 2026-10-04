@@ -12,7 +12,11 @@
 
     <header class="jarvis-header">
         <h1>Historial</h1>
-        <a href="{{ url_for('index') }}" class="btn-history">← Volver</a>
+        <div class="header-right">
+            <span class="user-email">{{ current_user_email }}</span>
+            <a href="{{ url_for('index') }}" class="btn-history">← Volver</a>
+            <a href="{{ url_for('logout') }}" class="btn-logout">Salir</a>
+        </div>
     </header>
 
     <div class="history-list">
