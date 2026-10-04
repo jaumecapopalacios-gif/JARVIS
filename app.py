@@ -1,7 +1,7 @@
 import os
 import json
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from functools import wraps
 
@@ -28,6 +28,15 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
+
+# =========================================================
+# SESIÓN PERSISTENTE (30 días sin volver a loguearse)
+# =========================================================
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 
 
 def get_db():
@@ -93,10 +102,6 @@ def init_db():
     db.commit()
     cur.close()
 
-
-# =========================================================
-# AUTENTICACIÓN
-# =========================================================
 
 def login_required(f):
     @wraps(f)
@@ -230,10 +235,6 @@ def detectar_comando_app(mensaje):
     return None
 
 
-# =========================================================
-# JARVIS
-# =========================================================
-
 def preguntar_jarvis(mensaje, timezone_str="America/Havana"):
     comando_app = detectar_comando_app(mensaje)
     if comando_app:
@@ -333,6 +334,8 @@ def login():
             if user is None or not check_password_hash(user["password_hash"], password):
                 error = "Email o contraseña incorrecta"
             else:
+                # ⚡ Mantener la sesión iniciada por 30 días
+                session.permanent = True
                 session["user_id"] = user["id"]
                 session["email"] = user["email"]
                 return redirect(url_for("index"))
@@ -387,12 +390,14 @@ def logout():
 @app.route("/")
 @login_required
 def index():
+    session.permanent = True  # Renueva la sesión en cada visita
     return render_template("index.html")
 
 
 @app.route("/history")
 @login_required
 def history():
+    session.permanent = True
     user_id = session["user_id"]
     mensajes = query_db("""
         SELECT role, message, created_at
