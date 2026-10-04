@@ -29,9 +29,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
 
-# =========================================================
-# SESIÓN PERSISTENTE (30 días sin volver a loguearse)
-# =========================================================
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -334,7 +331,6 @@ def login():
             if user is None or not check_password_hash(user["password_hash"], password):
                 error = "Email o contraseña incorrecta"
             else:
-                # ⚡ Mantener la sesión iniciada por 30 días
                 session.permanent = True
                 session["user_id"] = user["id"]
                 session["email"] = user["email"]
@@ -390,7 +386,7 @@ def logout():
 @app.route("/")
 @login_required
 def index():
-    session.permanent = True  # Renueva la sesión en cada visita
+    session.permanent = True
     return render_template("index.html")
 
 
