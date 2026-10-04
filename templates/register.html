@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jarvis - Crear cuenta</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h1 class="auth-title">JARVIS</h1>
+        <p class="auth-subtitle">Crea tu cuenta</p>
+
+        {% if error %}
+            <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="auth-form">
+            <input
+                type="email"
+                name="email"
+                placeholder="Correo electrónico"
+                autocomplete="email"
+                required
+            >
+            <input
+                type="password"
+                name="password"
+                placeholder="Contraseña (mín. 6 caracteres)"
+                autocomplete="new-password"
+                minlength="6"
+                required
+            >
+            <input
+                type="password"
+                name="password2"
+                placeholder="Repite la contraseña"
+                autocomplete="new-password"
+                minlength="6"
+                required
+            >
+            <button type="submit" class="btn-auth">Crear cuenta</button>
+        </form>
+
+        <p class="auth-footer">
+            ¿Ya tienes cuenta?
+            <a href="{{ url_for('login') }}">Iniciar sesión</a>
+        </p>
+    </div>
+</div>
+
+</body>
+</html>
